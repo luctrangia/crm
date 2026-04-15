@@ -6671,5 +6671,72 @@ export default {<br>
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+// Cấu hình kết nối Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyCVv_xZVIwYie7tHxyuUzXyfEGOsN79nWs",
+    databaseURL: "https://dongaprint-ai-default-rtdb.firebaseio.com",
+    projectId: "dongaprint-ai",
+    appId: "1:343037565964:web:c80e0b9f558af97f116229"
+};
+
+// Khởi tạo Firebase
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const database = firebase.database();
+
+// Lắng nghe dữ liệu (Hút tin nhắn từ web về CRM)
+database.ref('sessions').on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    // Sắp xếp tin nhắn mới nhất lên đầu
+    const sessionList = Object.keys(data).map(id => ({ id: id, ...data[id] }));
+    sessionList.sort((a, b) => (b.lastTime || 0) - (a.lastTime || 0));
+    
+    // Gắn vào biến của CRM để hiển thị
+    window.sessions = sessionList; 
+    
+    // Cập nhật giao diện
+    if (typeof renderSessions === "function") renderSessions();
+    if (typeof activeSessionId !== 'undefined' && activeSessionId && typeof renderMessages === "function") {
+        renderMessages(activeSessionId);
+    }
+});
+
+// Hàm gửi tin nhắn từ CRM lên lại Web
+window.sendMessage = function() {
+    // Lấy nội dung từ ô nhập liệu (yêu cầu ô nhập phải có id là chatInput)
+    const input = document.getElementById('chatInput');
+    if (!input) {
+        console.error("Không tìm thấy ô nhập tin nhắn có id='chatInput'");
+        return;
+    }
+
+    const text = input.value.trim();
+    if (!text || typeof activeSessionId === 'undefined' || !activeSessionId) return;
+
+    const msgData = {
+        text: text, 
+        role: 'staff', 
+        name: 'Đông Á Admin', 
+        time: Date.now()
+    };
+
+    // Đẩy tin nhắn lên Firebase
+    database.ref('sessions/' + activeSessionId + '/messages').push(msgData);
+    
+    // Cập nhật trạng thái
+    database.ref('sessions/' + activeSessionId).update({
+        lastMsg: text, 
+        lastTime: Date.now(), 
+        unread: false
+    });
+
+    input.value = ''; // Xóa chữ trong ô nhập sau khi gửi
+};
+</script>
 </body>
 </html>
